@@ -25,6 +25,10 @@ class AppSettings extends ChangeNotifier {
   String _apiKey = '';
   String get apiKey => _apiKey;
 
+  // Haptic
+  int _hapticLevel = 2; // 0=off, 1=light, 2=medium, 3=heavy
+  int get hapticLevel => _hapticLevel;
+
   // Фильтры
   double _minVolume = 0;
   double get minVolume => _minVolume;
@@ -39,6 +43,7 @@ class AppSettings extends ChangeNotifier {
   static const _keyApiKey = 'api_key';
   static const _keyMinVolume = 'min_volume';
   static const _keyMaxDays = 'max_days';
+  static const _keyHaptic = 'haptic_level';
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
@@ -48,6 +53,7 @@ class AppSettings extends ChangeNotifier {
     _apiKey = p.getString(_keyApiKey) ?? '';
     _minVolume = p.getDouble(_keyMinVolume) ?? 0;
     _maxDaysLeft = p.getInt(_keyMaxDays) ?? 0;
+    _hapticLevel = p.getInt(_keyHaptic) ?? 2;
     final cats = p.getStringList(_keyCategories);
     _selectedCategories = cats != null ? Set.from(cats) : {};
     notifyListeners();
@@ -92,6 +98,13 @@ class AppSettings extends ChangeNotifier {
     _maxDaysLeft = v;
     final p = await SharedPreferences.getInstance();
     await p.setInt(_keyMaxDays, v);
+    notifyListeners();
+  }
+
+  Future<void> setHapticLevel(int v) async {
+    _hapticLevel = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(_keyHaptic, v);
     notifyListeners();
   }
 

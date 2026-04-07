@@ -1,6 +1,6 @@
 import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../utils/haptic.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
 import '../models/app_settings.dart';
@@ -29,6 +29,7 @@ class _FeedScreenState extends State<FeedScreen> {
   int _skips = 0;
   bool _loadingMore = false;
   Market? _lastSkipped;
+  double _swipeProgress = 0.0;
 
   @override
   void initState() {
@@ -65,11 +66,11 @@ class _FeedScreenState extends State<FeedScreen> {
   void _onSwipe(int prevIndex, int? currentIndex, SwiperActivity activity) {
     if (activity is Swipe) {
       if (activity.direction == AxisDirection.right) {
-        HapticFeedback.mediumImpact();
+        Haptic.medium();
         setState(() { _bets++; _lastSkipped = null; });
         _openBetDialog(_markets[prevIndex]);
       } else if (activity.direction == AxisDirection.left) {
-        HapticFeedback.lightImpact();
+        Haptic.light();
         setState(() { _skips++; _lastSkipped = _markets[prevIndex]; });
       }
     }
@@ -84,7 +85,7 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _openBetDialog(Market market) async {
     final result = await showBetDialog(context, market);
     if (result != null && mounted) {
-      HapticFeedback.heavyImpact();
+      Haptic.heavy();
       _showFeedback(
         '🎯 Bet placed: \$${result.amount.toStringAsFixed(0)} on ${result.outcome}',
         const Color(0xFF00D09E),
@@ -93,7 +94,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _openDetail(Market market) {
-    HapticFeedback.selectionClick();
+    Haptic.selection();
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => MarketDetailScreen(market: market)),
@@ -103,7 +104,7 @@ class _FeedScreenState extends State<FeedScreen> {
   void _undoLastSkip() {
     try {
       _swiperController.unswipe();
-      HapticFeedback.mediumImpact();
+      Haptic.medium();
       setState(() { _skips = (_skips - 1).clamp(0, 9999); _lastSkipped = null; });
     } catch (_) {}
   }
@@ -280,14 +281,23 @@ class _FeedScreenState extends State<FeedScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: AppinioSwiper(
-        controller: _swiperController,
-        cardCount: _markets.length,
-        onSwipeEnd: _onSwipe,
-        onEnd: () => _loadMarkets(),
-        cardBuilder: (context, index) => MarketCard(
-          market: _markets[index],
-          onTap: () => _openDetail(_markets[index]),
+      child: GestureDetector(
+        onHorizontalDragUpdate: (d) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          setState(() => _swipeProgress = (_swipeProgress + d.delta.dx / screenWidth * 2).clamp(-1.0, 1.0));
+        },
+        onHorizontalDragEnd: (_) => setState(() => _swipeProgress = 0.0),
+        onHorizontalDragCancel: () => setState(() => _swipeProgress = 0.0),
+        child: AppinioSwiper(
+          controller: _swiperController,
+          cardCount: _markets.length,
+          onSwipeEnd: _onSwipe,
+          onEnd: () => _loadMarkets(),
+          cardBuilder: (context, index) => MarketCard(
+            market: _markets[index],
+            swipeProgress: index == _currentIndex ? _swipeProgress : 0.0,
+            onTap: () => _openDetail(_markets[index]),
+          ),
         ),
       ),
     );
@@ -302,7 +312,7 @@ class _FeedScreenState extends State<FeedScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _ActionButton(
-            onTap: () { HapticFeedback.lightImpact(); _swiperController.swipeLeft(); },
+            onTap: () { Haptic.light(); _swiperController.swipeLeft(); },
             icon: Icons.close_rounded,
             color: const Color(0xFFFF4D6D),
             label: 'SKIP',
@@ -318,7 +328,7 @@ class _FeedScreenState extends State<FeedScreen> {
             badge: _lastSkipped == null ? '★' : null,
           ),
           _ActionButton(
-            onTap: () { HapticFeedback.mediumImpact(); _swiperController.swipeRight(); },
+            onTap: () { Haptic.medium(); _swiperController.swipeRight(); },
             icon: Icons.bolt_rounded,
             color: const Color(0xFF00D09E),
             label: 'BET',

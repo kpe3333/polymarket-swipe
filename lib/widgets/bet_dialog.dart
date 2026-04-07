@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/haptic.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
 import '../models/app_settings.dart';
@@ -33,7 +34,7 @@ class _BetDialogState extends State<BetDialog> {
   String? _selectedOutcome;
   late double _amount;
 
-  static const _quickAmounts = [5.0, 10.0, 25.0, 50.0, 100.0];
+  static const _quickAmounts = [1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
 
   @override
   void initState() {
@@ -101,7 +102,7 @@ class _BetDialogState extends State<BetDialog> {
                     color: style.primary,
                     selected: _selectedOutcome == yes,
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      Haptic.selection();
                       setState(() => _selectedOutcome = yes);
                     },
                   )),
@@ -112,7 +113,7 @@ class _BetDialogState extends State<BetDialog> {
                     color: const Color(0xFFFF4D6D),
                     selected: _selectedOutcome == no,
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      Haptic.selection();
                       setState(() => _selectedOutcome = no);
                     },
                   )),
@@ -132,7 +133,7 @@ class _BetDialogState extends State<BetDialog> {
                   final selected = _amount == v;
                   return GestureDetector(
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      Haptic.selection();
                       setState(() => _amount = v);
                     },
                     child: Container(
@@ -233,7 +234,7 @@ class _BetDialogState extends State<BetDialog> {
   }
 
   void _confirm() {
-    HapticFeedback.mediumImpact();
+    Haptic.heavy();
     Navigator.pop(context, BetResult(outcome: _selectedOutcome!, amount: _amount));
   }
 }
