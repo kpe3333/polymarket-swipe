@@ -9,6 +9,7 @@ class Market {
   final DateTime? endDate;
   final String? category;
   final String? image;
+  final String? description;
 
   Market({
     required this.id,
@@ -19,6 +20,7 @@ class Market {
     this.endDate,
     this.category,
     this.image,
+    this.description,
   });
 
   double get yesPrice => prices.isNotEmpty ? prices[0] : 0.5;
@@ -73,6 +75,7 @@ class Market {
       endDate: endDate,
       category: json['category']?.toString(),
       image: json['image']?.toString(),
+      description: json['description']?.toString(),
     );
   }
 }

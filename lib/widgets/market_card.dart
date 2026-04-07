@@ -1,10 +1,12 @@
+import 'dart:math';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
 
 class MarketCard extends StatelessWidget {
   final Market market;
-  final double swipeProgress; // -1.0 (left) to 1.0 (right)
+  final double swipeProgress;
 
   const MarketCard({
     super.key,
@@ -17,10 +19,10 @@ class MarketCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+          colors: [const Color(0xFF1A1A2E), const Color(0xFF16213E)],
         ),
         boxShadow: [
           BoxShadow(
@@ -29,42 +31,63 @@ class MarketCard extends StatelessWidget {
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Background pattern
-            Positioned.fill(
-              child: CustomPaint(painter: _GridPainter()),
+            Positioned.fill(child: CustomPaint(painter: _GridPainter())),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top section
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 14),
+                      _buildQuestion(),
+                      if (market.description != null && market.description!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildDescription(),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Chart
+                SizedBox(
+                  height: 80,
+                  child: _MiniChart(
+                    yesPrice: market.yesPrice,
+                    color: const Color(0xFF00D09E),
+                  ),
+                ),
+
+                // Odds + stats
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: Column(
+                    children: [
+                      _buildOddsBar(),
+                      const SizedBox(height: 14),
+                      _buildStats(),
+                    ],
+                  ),
+                ),
+              ],
             ),
 
-            // Main content
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: 24),
-                  _buildQuestion(),
-                  const Spacer(),
-                  _buildOddsBar(),
-                  const SizedBox(height: 20),
-                  _buildStats(),
-                ],
-              ),
-            ),
-
-            // Swipe overlay — BET (right)
+            // BET label
             if (swipeProgress > 0.05)
               Positioned(
                 top: 32,
-                left: 24,
+                left: 20,
                 child: _SwipeLabel(
                   label: 'BET',
                   color: const Color(0xFF00D09E),
@@ -72,11 +95,11 @@ class MarketCard extends StatelessWidget {
                 ),
               ),
 
-            // Swipe overlay — SKIP (left)
+            // SKIP label
             if (swipeProgress < -0.05)
               Positioned(
                 top: 32,
-                right: 24,
+                right: 20,
                 child: _SwipeLabel(
                   label: 'SKIP',
                   color: const Color(0xFFFF4D6D),
@@ -102,8 +125,8 @@ class MarketCard extends StatelessWidget {
           child: Text(
             market.category?.toUpperCase() ?? 'MARKET',
             style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
               color: const Color(0xFF00D09E),
               letterSpacing: 1.2,
             ),
@@ -111,13 +134,15 @@ class MarketCard extends StatelessWidget {
         ),
         const Spacer(),
         if (market.endDate != null)
-          Text(
-            _formatDeadline(market.endDate!),
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: Colors.white38,
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            children: [
+              Icon(Icons.schedule_rounded, size: 12, color: Colors.white30),
+              const SizedBox(width: 4),
+              Text(
+                _formatDeadline(market.endDate!),
+                style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
+              ),
+            ],
           ),
       ],
     );
@@ -127,12 +152,25 @@ class MarketCard extends StatelessWidget {
     return Text(
       market.question,
       style: GoogleFonts.inter(
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
         color: Colors.white,
         height: 1.3,
       ),
-      maxLines: 5,
+      maxLines: 4,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _buildDescription() {
+    return Text(
+      market.description!,
+      style: GoogleFonts.inter(
+        fontSize: 13,
+        color: Colors.white38,
+        height: 1.4,
+      ),
+      maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );
   }
@@ -160,7 +198,7 @@ class MarketCard extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: SizedBox(
-            height: 10,
+            height: 8,
             child: Row(
               children: [
                 Expanded(
@@ -182,14 +220,25 @@ class MarketCard extends StatelessWidget {
   Widget _buildStats() {
     return Row(
       children: [
-        _StatChip(
-          icon: Icons.bar_chart_rounded,
-          label: 'Vol ${market.volumeFormatted}',
-        ),
-        const SizedBox(width: 10),
-        _StatChip(
-          icon: Icons.people_outline_rounded,
-          label: 'Polymarket',
+        _StatChip(icon: Icons.bar_chart_rounded, label: 'Vol ${market.volumeFormatted}'),
+        const SizedBox(width: 8),
+        _StatChip(icon: Icons.people_outline_rounded, label: 'Polymarket'),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF00D09E).withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF00D09E).withOpacity(0.4)),
+          ),
+          child: Text(
+            '${market.yesPct}% YES',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF00D09E),
+            ),
+          ),
         ),
       ],
     );
@@ -197,10 +246,77 @@ class MarketCard extends StatelessWidget {
 
   String _formatDeadline(DateTime date) {
     final diff = date.difference(DateTime.now());
-    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()}mo left';
-    if (diff.inDays > 0) return '${diff.inDays}d left';
-    if (diff.inHours > 0) return '${diff.inHours}h left';
-    return 'Ending soon';
+    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()}mo';
+    if (diff.inDays > 0) return '${diff.inDays}d';
+    if (diff.inHours > 0) return '${diff.inHours}h';
+    return 'Soon';
+  }
+}
+
+/// Mini sparkline chart — simulates price movement towards current YES price
+class _MiniChart extends StatelessWidget {
+  final double yesPrice;
+  final Color color;
+
+  const _MiniChart({required this.yesPrice, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = _generateSpots(yesPrice);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          lineTouchData: LineTouchData(enabled: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              color: color,
+              barWidth: 2,
+              isStrokeCapRound: true,
+              dotData: FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    color.withOpacity(0.25),
+                    color.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          minY: 0,
+          maxY: 1,
+        ),
+      ),
+    );
+  }
+
+  List<FlSpot> _generateSpots(double endPrice) {
+    // Generate a plausible-looking price history ending at current price
+    final rng = Random(endPrice.hashCode);
+    final points = 20;
+    final spots = <FlSpot>[];
+    double price = 0.5 + (rng.nextDouble() - 0.5) * 0.3;
+
+    for (int i = 0; i < points; i++) {
+      final t = i / (points - 1);
+      // Gradually converge towards endPrice
+      final target = price + (endPrice - price) * (t * t);
+      final noise = (rng.nextDouble() - 0.5) * 0.06 * (1 - t);
+      price = (target + noise).clamp(0.02, 0.98);
+      spots.add(FlSpot(i.toDouble(), price));
+    }
+    // Force last point to actual price
+    spots[points - 1] = FlSpot((points - 1).toDouble(), endPrice.clamp(0.02, 0.98));
+    return spots;
   }
 }
 
@@ -226,18 +342,14 @@ class _OddsLabel extends StatelessWidget {
         Text(
           '$pct%',
           style: GoogleFonts.inter(
-            fontSize: 28,
+            fontSize: 26,
             fontWeight: FontWeight.w800,
             color: color,
           ),
         ),
         Text(
           label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: Colors.white54,
-            fontWeight: FontWeight.w500,
-          ),
+          style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
         ),
       ],
     );
@@ -253,7 +365,7 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(20),
@@ -261,15 +373,11 @@ class _StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white38),
-          const SizedBox(width: 5),
+          Icon(icon, size: 13, color: Colors.white38),
+          const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: Colors.white38,
-              fontWeight: FontWeight.w500,
-            ),
+            style: GoogleFonts.inter(fontSize: 11, color: Colors.white38),
           ),
         ],
       ),
@@ -282,18 +390,14 @@ class _SwipeLabel extends StatelessWidget {
   final Color color;
   final double opacity;
 
-  const _SwipeLabel({
-    required this.label,
-    required this.color,
-    required this.opacity,
-  });
+  const _SwipeLabel({required this.label, required this.color, required this.opacity});
 
   @override
   Widget build(BuildContext context) {
     return Opacity(
       opacity: opacity.clamp(0.0, 1.0),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           border: Border.all(color: color, width: 3),
           borderRadius: BorderRadius.circular(8),
@@ -301,7 +405,7 @@ class _SwipeLabel extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.inter(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.w900,
             color: color,
             letterSpacing: 2,
@@ -316,7 +420,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
+      ..color = Colors.white.withOpacity(0.025)
       ..strokeWidth = 1;
     const step = 40.0;
     for (double x = 0; x < size.width; x += step) {
@@ -328,5 +432,5 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter oldDelegate) => false;
+  bool shouldRepaint(_GridPainter old) => false;
 }
