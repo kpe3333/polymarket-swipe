@@ -25,18 +25,29 @@ class PolymarketApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppSettings(),
-      builder: (_, __) => MaterialApp(
-        title: 'PolySwipe',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(
-          scaffoldBackgroundColor: const Color(0xFF0A0A14),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF00D09E),
-            secondary: Color(0xFFFF4D6D),
+      builder: (_, __) {
+        final dark = AppSettings().darkMode;
+        return MaterialApp(
+          title: 'PolySwipe',
+          debugShowCheckedModeBanner: false,
+          themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+          darkTheme: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: const Color(0xFF0A0A14),
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF00D09E),
+              secondary: Color(0xFFFF4D6D),
+            ),
           ),
-        ),
-        home: const MainShell(),
-      ),
+          theme: ThemeData.light().copyWith(
+            scaffoldBackgroundColor: const Color(0xFFF2F4F7),
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF00A87A),
+              secondary: Color(0xFFE5334A),
+            ),
+          ),
+          home: const MainShell(),
+        );
+      },
     );
   }
 }

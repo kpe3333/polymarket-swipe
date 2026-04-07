@@ -146,7 +146,7 @@ class _AccountScreenState extends State<AccountScreen> {
             label: '\$${v.toStringAsFixed(0)}',
             selected: sel,
             color: const Color(0xFF00D09E),
-            onTap: () => setState(() { Haptic.selection(); _settings.setDefaultBet(v); }),
+            onTap: () async { Haptic.selection(); await _settings.setDefaultBet(v); setState(() {}); },
           );
         }).toList(),
       ),
@@ -221,7 +221,7 @@ class _AccountScreenState extends State<AccountScreen> {
           label: label,
           selected: _settings.minVolume == v,
           color: const Color(0xFF00D09E),
-          onTap: () => setState(() { Haptic.selection(); _settings.setMinVolume(v); }),
+          onTap: () async { Haptic.selection(); await _settings.setMinVolume(v); setState(() {}); },
         );
       }).toList()),
 
@@ -237,7 +237,7 @@ class _AccountScreenState extends State<AccountScreen> {
           label: label,
           selected: _settings.maxDaysLeft == d,
           color: const Color(0xFF00D09E),
-          onTap: () => setState(() { Haptic.selection(); _settings.setMaxDaysLeft(d); }),
+          onTap: () async { Haptic.selection(); await _settings.setMaxDaysLeft(d); setState(() {}); },
         );
       }).toList()),
     ]);
@@ -275,7 +275,7 @@ class _AccountScreenState extends State<AccountScreen> {
             label: cat,
             selected: sel,
             color: const Color(0xFF00D09E),
-            onTap: () => setState(() { Haptic.selection(); _settings.toggleCategory(cat); }),
+            onTap: () async { Haptic.selection(); await _settings.toggleCategory(cat); setState(() {}); },
           );
         }).toList(),
       ),
@@ -290,7 +290,7 @@ class _AccountScreenState extends State<AccountScreen> {
         label: 'Dark Mode',
         trailing: Switch(
           value: _settings.darkMode,
-          onChanged: (v) { Haptic.light(); setState(() => _settings.setDarkMode(v)); },
+          onChanged: (v) async { Haptic.light(); await _settings.setDarkMode(v); setState(() {}); },
           activeColor: const Color(0xFF00D09E),
         ),
       ),
@@ -307,9 +307,10 @@ class _AccountScreenState extends State<AccountScreen> {
           final sel = _settings.hapticLevel == i;
           return Expanded(
             child: GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact(); // always vibrate on this tap
-                setState(() => _settings.setHapticLevel(i));
+              onTap: () async {
+                HapticFeedback.mediumImpact();
+                await _settings.setHapticLevel(i);
+                setState(() {});
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
