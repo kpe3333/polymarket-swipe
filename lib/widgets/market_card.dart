@@ -3,148 +3,139 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
+import '../utils/category_colors.dart';
 
 class MarketCard extends StatelessWidget {
   final Market market;
-  final double swipeProgress;
+  final double swipeProgress; // -1.0 left .. 1.0 right
+  final VoidCallback? onTap;
 
   const MarketCard({
     super.key,
     required this.market,
     this.swipeProgress = 0.0,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [const Color(0xFF1A1A2E), const Color(0xFF16213E)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    final style = categoryStyle(market.category);
+    final betOpacity = swipeProgress.clamp(0.0, 1.0);
+    final skipOpacity = (-swipeProgress).clamp(0.0, 1.0);
+
+    // Tint overlay color when swiping
+    Color? tintColor;
+    if (swipeProgress > 0.05) tintColor = const Color(0xFF00D09E).withOpacity(betOpacity * 0.15);
+    if (swipeProgress < -0.05) tintColor = const Color(0xFFFF4D6D).withOpacity(skipOpacity * 0.15);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: style.gradient,
           ),
-        ],
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Top section
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 14),
-                      _buildQuestion(),
-                      if (market.description != null && market.description!.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        _buildDescription(),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Chart
-                SizedBox(
-                  height: 80,
-                  child: _MiniChart(
-                    yesPrice: market.yesPrice,
-                    color: const Color(0xFF00D09E),
-                  ),
-                ),
-
-                // Odds + stats
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                  child: Column(
-                    children: [
-                      _buildOddsBar(),
-                      const SizedBox(height: 14),
-                      _buildStats(),
-                    ],
-                  ),
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: style.primary.withOpacity(0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-
-            // BET label
-            if (swipeProgress > 0.05)
-              Positioned(
-                top: 32,
-                left: 20,
-                child: _SwipeLabel(
-                  label: 'BET',
-                  color: const Color(0xFF00D09E),
-                  opacity: swipeProgress.clamp(0.0, 1.0),
-                ),
-              ),
-
-            // SKIP label
-            if (swipeProgress < -0.05)
-              Positioned(
-                top: 32,
-                right: 20,
-                child: _SwipeLabel(
-                  label: 'SKIP',
-                  color: const Color(0xFFFF4D6D),
-                  opacity: (-swipeProgress).clamp(0.0, 1.0),
-                ),
-              ),
           ],
+          border: Border.all(color: style.primary.withOpacity(0.15)),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F3460).withOpacity(0.8),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF00D09E).withOpacity(0.3)),
-          ),
-          child: Text(
-            market.category?.toUpperCase() ?? 'MARKET',
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF00D09E),
-              letterSpacing: 1.2,
-            ),
-          ),
-        ),
-        const Spacer(),
-        if (market.endDate != null)
-          Row(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
             children: [
-              Icon(Icons.schedule_rounded, size: 12, color: Colors.white30),
-              const SizedBox(width: 4),
-              Text(
-                _formatDeadline(market.endDate!),
-                style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
+              Positioned.fill(child: CustomPaint(painter: _GridPainter(style.primary))),
+
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Image header
+                  if (market.image != null && market.image!.isNotEmpty)
+                    _ImageHeader(imageUrl: market.image!, primary: style.primary)
+                  else
+                    _CategoryHeader(category: market.category, primary: style.primary),
+
+                  // Content
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildQuestion(),
+                          if (market.description != null && market.description!.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _buildDescription(),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Chart
+                  SizedBox(
+                    height: 72,
+                    child: _MiniChart(yesPrice: market.yesPrice, color: style.primary),
+                  ),
+
+                  // Odds + stats
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+                    child: Column(
+                      children: [
+                        _buildOddsBar(style.primary),
+                        const SizedBox(height: 12),
+                        _buildStats(style.primary),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // Swipe tint overlay
+              if (tintColor != null)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: tintColor,
+                    ),
+                  ),
+                ),
+
+              // BET label
+              if (swipeProgress > 0.05)
+                Positioned(
+                  top: 28,
+                  left: 20,
+                  child: _SwipeLabel(label: 'BET', color: const Color(0xFF00D09E), opacity: betOpacity),
+                ),
+
+              // SKIP label
+              if (swipeProgress < -0.05)
+                Positioned(
+                  top: 28,
+                  right: 20,
+                  child: _SwipeLabel(label: 'SKIP', color: const Color(0xFFFF4D6D), opacity: skipOpacity),
+                ),
+
+              // Tap hint
+              Positioned(
+                bottom: 18,
+                right: 20,
+                child: Icon(Icons.open_in_full_rounded, size: 14, color: Colors.white12),
               ),
             ],
           ),
-      ],
+        ),
+      ),
     );
   }
 
@@ -152,7 +143,7 @@ class MarketCard extends StatelessWidget {
     return Text(
       market.question,
       style: GoogleFonts.inter(
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: FontWeight.w700,
         color: Colors.white,
         height: 1.3,
@@ -165,17 +156,13 @@ class MarketCard extends StatelessWidget {
   Widget _buildDescription() {
     return Text(
       market.description!,
-      style: GoogleFonts.inter(
-        fontSize: 13,
-        color: Colors.white38,
-        height: 1.4,
-      ),
+      style: GoogleFonts.inter(fontSize: 12, color: Colors.white38, height: 1.4),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );
   }
 
-  Widget _buildOddsBar() {
+  Widget _buildOddsBar(Color primary) {
     return Column(
       children: [
         Row(
@@ -184,7 +171,7 @@ class MarketCard extends StatelessWidget {
             _OddsLabel(
               label: market.outcomes.isNotEmpty ? market.outcomes[0] : 'YES',
               pct: market.yesPct,
-              color: const Color(0xFF00D09E),
+              color: primary,
             ),
             _OddsLabel(
               label: market.outcomes.length > 1 ? market.outcomes[1] : 'NO',
@@ -194,21 +181,15 @@ class MarketCard extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: SizedBox(
             height: 8,
             child: Row(
               children: [
-                Expanded(
-                  flex: market.yesPct,
-                  child: Container(color: const Color(0xFF00D09E)),
-                ),
-                Expanded(
-                  flex: market.noPct,
-                  child: Container(color: const Color(0xFFFF4D6D)),
-                ),
+                Expanded(flex: market.yesPct, child: Container(color: primary)),
+                Expanded(flex: market.noPct, child: Container(color: const Color(0xFFFF4D6D))),
               ],
             ),
           ),
@@ -217,27 +198,28 @@ class MarketCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStats() {
+  Widget _buildStats(Color primary) {
     return Row(
       children: [
         _StatChip(icon: Icons.bar_chart_rounded, label: 'Vol ${market.volumeFormatted}'),
         const SizedBox(width: 8),
-        _StatChip(icon: Icons.people_outline_rounded, label: 'Polymarket'),
+        if (market.endDate != null) ...[
+          _StatChip(
+            icon: Icons.schedule_rounded,
+            label: _formatDeadline(market.endDate!),
+          ),
+        ],
         const Spacer(),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: const Color(0xFF00D09E).withOpacity(0.15),
+            color: primary.withOpacity(0.15),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF00D09E).withOpacity(0.4)),
+            border: Border.all(color: primary.withOpacity(0.4)),
           ),
           child: Text(
             '${market.yesPct}% YES',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF00D09E),
-            ),
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: primary),
           ),
         ),
       ],
@@ -253,7 +235,76 @@ class MarketCard extends StatelessWidget {
   }
 }
 
-/// Mini sparkline chart — simulates price movement towards current YES price
+class _ImageHeader extends StatelessWidget {
+  final String imageUrl;
+  final Color primary;
+
+  const _ImageHeader({required this.imageUrl, required this.primary});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 130,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _CategoryHeader(category: null, primary: primary),
+          ),
+          // Gradient fade bottom
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryHeader extends StatelessWidget {
+  final String? category;
+  final Color primary;
+
+  const _CategoryHeader({required this.category, required this.primary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: primary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: primary.withOpacity(0.4)),
+            ),
+            child: Text(
+              (category ?? 'MARKET').toUpperCase(),
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: primary,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MiniChart extends StatelessWidget {
   final double yesPrice;
   final Color color;
@@ -284,10 +335,7 @@ class _MiniChart extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    color.withOpacity(0.25),
-                    color.withOpacity(0.0),
-                  ],
+                  colors: [color.withOpacity(0.3), color.withOpacity(0.0)],
                 ),
               ),
             ),
@@ -300,21 +348,17 @@ class _MiniChart extends StatelessWidget {
   }
 
   List<FlSpot> _generateSpots(double endPrice) {
-    // Generate a plausible-looking price history ending at current price
     final rng = Random(endPrice.hashCode);
-    final points = 20;
+    const points = 20;
     final spots = <FlSpot>[];
     double price = 0.5 + (rng.nextDouble() - 0.5) * 0.3;
-
     for (int i = 0; i < points; i++) {
       final t = i / (points - 1);
-      // Gradually converge towards endPrice
       final target = price + (endPrice - price) * (t * t);
       final noise = (rng.nextDouble() - 0.5) * 0.06 * (1 - t);
       price = (target + noise).clamp(0.02, 0.98);
       spots.add(FlSpot(i.toDouble(), price));
     }
-    // Force last point to actual price
     spots[points - 1] = FlSpot((points - 1).toDouble(), endPrice.clamp(0.02, 0.98));
     return spots;
   }
@@ -326,31 +370,15 @@ class _OddsLabel extends StatelessWidget {
   final Color color;
   final TextAlign align;
 
-  const _OddsLabel({
-    required this.label,
-    required this.pct,
-    required this.color,
-    this.align = TextAlign.left,
-  });
+  const _OddsLabel({required this.label, required this.pct, required this.color, this.align = TextAlign.left});
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          align == TextAlign.right ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: align == TextAlign.right ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Text(
-          '$pct%',
-          style: GoogleFonts.inter(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 12, color: Colors.white38),
-        ),
+        Text('$pct%', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: color)),
+        Text(label, style: GoogleFonts.inter(fontSize: 12, color: Colors.white38)),
       ],
     );
   }
@@ -365,7 +393,7 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(20),
@@ -373,12 +401,9 @@ class _StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: Colors.white38),
+          Icon(icon, size: 12, color: Colors.white38),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(fontSize: 11, color: Colors.white38),
-          ),
+          Text(label, style: GoogleFonts.inter(fontSize: 11, color: Colors.white38)),
         ],
       ),
     );
@@ -417,11 +442,12 @@ class _SwipeLabel extends StatelessWidget {
 }
 
 class _GridPainter extends CustomPainter {
+  final Color color;
+  _GridPainter(this.color);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.025)
-      ..strokeWidth = 1;
+    final paint = Paint()..color = color.withOpacity(0.04)..strokeWidth = 1;
     const step = 40.0;
     for (double x = 0; x < size.width; x += step) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
@@ -432,5 +458,5 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter old) => false;
+  bool shouldRepaint(_GridPainter old) => old.color != color;
 }

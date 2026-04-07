@@ -26,7 +26,7 @@ class PolymarketApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: AppSettings(),
       builder: (_, __) => MaterialApp(
-        title: 'Polymarket Swipe',
+        title: 'PolySwipe',
         debugShowCheckedModeBanner: false,
         theme: ThemeData.dark().copyWith(
           scaffoldBackgroundColor: const Color(0xFF0A0A14),
