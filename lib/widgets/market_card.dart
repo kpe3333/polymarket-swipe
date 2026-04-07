@@ -58,7 +58,7 @@ class MarketCard extends StatelessWidget {
                 children: [
                   // Image header
                   if (market.image != null && market.image!.isNotEmpty)
-                    _ImageHeader(imageUrl: market.image!, primary: style.primary)
+                    _ImageHeader(imageUrl: market.image!, primary: style.primary, category: market.category)
                   else
                     _CategoryHeader(category: market.category, primary: style.primary),
 
@@ -238,20 +238,25 @@ class MarketCard extends StatelessWidget {
 class _ImageHeader extends StatelessWidget {
   final String imageUrl;
   final Color primary;
+  final String? category;
 
-  const _ImageHeader({required this.imageUrl, required this.primary});
+  const _ImageHeader({required this.imageUrl, required this.primary, this.category});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 130,
+      height: 120,
       child: Stack(
         fit: StackFit.expand,
         children: [
           Image.network(
             imageUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _CategoryHeader(category: null, primary: primary),
+            loadingBuilder: (_, child, progress) {
+              if (progress == null) return child;
+              return Container(color: primary.withOpacity(0.1));
+            },
+            errorBuilder: (_, __, ___) => _CategoryHeader(category: category, primary: primary),
           ),
           // Gradient fade bottom
           Container(
@@ -259,7 +264,27 @@ class _ImageHeader extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+              ),
+            ),
+          ),
+          // Category chip on top of image
+          Positioned(
+            top: 12,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: primary.withOpacity(0.6)),
+              ),
+              child: Text(
+                (category ?? 'MARKET').toUpperCase(),
+                style: GoogleFonts.inter(
+                  fontSize: 10, fontWeight: FontWeight.w700,
+                  color: primary, letterSpacing: 1.2,
+                ),
               ),
             ),
           ),

@@ -83,6 +83,9 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Future<void> _openBetDialog(Market market) async {
+    FocusScope.of(context).unfocus();
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
     final result = await showBetDialog(context, market);
     if (result != null && mounted) {
       Haptic.heavy();
@@ -281,13 +284,17 @@ class _FeedScreenState extends State<FeedScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: GestureDetector(
-        onHorizontalDragUpdate: (d) {
+      child: Listener(
+        onPointerMove: (e) {
           final screenWidth = MediaQuery.of(context).size.width;
-          setState(() => _swipeProgress = (_swipeProgress + d.delta.dx / screenWidth * 2).clamp(-1.0, 1.0));
+          final delta = e.delta.dx / screenWidth * 2.5;
+          final next = (_swipeProgress + delta).clamp(-1.0, 1.0);
+          if ((next - _swipeProgress).abs() > 0.01) {
+            setState(() => _swipeProgress = next);
+          }
         },
-        onHorizontalDragEnd: (_) => setState(() => _swipeProgress = 0.0),
-        onHorizontalDragCancel: () => setState(() => _swipeProgress = 0.0),
+        onPointerUp: (_) => setState(() => _swipeProgress = 0.0),
+        onPointerCancel: (_) => setState(() => _swipeProgress = 0.0),
         child: AppinioSwiper(
           controller: _swiperController,
           cardCount: _markets.length,

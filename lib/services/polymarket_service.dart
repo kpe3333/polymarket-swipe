@@ -14,9 +14,7 @@ class PolymarketService {
       'ascending': 'false',
     });
 
-    final response = await http.get(uri, headers: {
-      'Accept': 'application/json',
-    });
+    final response = await http.get(uri, headers: {'Accept': 'application/json'});
 
     if (response.statusCode != 200) {
       throw Exception('Polymarket API error: ${response.statusCode}');
