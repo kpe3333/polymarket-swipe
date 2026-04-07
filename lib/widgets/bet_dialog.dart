@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
 import '../utils/haptic.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
 import '../models/app_settings.dart';
+import '../models/bet.dart';
 import '../utils/category_colors.dart';
 
 Future<BetResult?> showBetDialog(BuildContext context, Market market) {
@@ -235,6 +237,19 @@ class _BetDialogState extends State<BetDialog> {
 
   void _confirm() {
     Haptic.heavy();
+    final yes = widget.market.outcomes.isNotEmpty ? widget.market.outcomes[0] : 'YES';
+    final price = _selectedOutcome == yes ? widget.market.yesPrice : widget.market.noPrice;
+    BetStore().addBet(Bet(
+      id: const Uuid().v4(),
+      marketId: widget.market.id,
+      question: widget.market.question,
+      outcome: _selectedOutcome!,
+      amount: _amount,
+      price: price,
+      placedAt: DateTime.now(),
+      image: widget.market.image,
+      category: widget.market.category,
+    ));
     Navigator.pop(context, BetResult(outcome: _selectedOutcome!, amount: _amount));
   }
 }

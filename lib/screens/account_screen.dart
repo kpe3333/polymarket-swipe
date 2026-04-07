@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/app_settings.dart';
+import '../services/translation_service.dart';
 import '../utils/haptic.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -60,6 +61,8 @@ class _AccountScreenState extends State<AccountScreen> {
             SliverToBoxAdapter(child: _buildAppearanceSection()),
             SliverToBoxAdapter(child: _sectionTitle('📳 Haptic Feedback')),
             SliverToBoxAdapter(child: _buildHapticSection()),
+            SliverToBoxAdapter(child: _sectionTitle('🌐 Language')),
+            SliverToBoxAdapter(child: _buildLanguageSection()),
             SliverToBoxAdapter(child: _sectionTitle('ℹ️ About')),
             SliverToBoxAdapter(child: _buildAboutSection()),
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
@@ -337,6 +340,145 @@ class _AccountScreenState extends State<AccountScreen> {
     ]);
   }
 
+  // ── LANGUAGE ─────────────────────────────────────────────
+  Widget _buildLanguageSection() {
+    final ts = TranslationService();
+    final langs = TranslationService.availableLanguages;
+
+    return _Card(children: [
+      // Mode selector
+      Text('Card language mode', style: _label()),
+      const SizedBox(height: 12),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _LangModeOption(
+            label: 'English only',
+            subtitle: 'Show market questions in English',
+            selected: ts.mode == LangMode.english,
+            onTap: () async {
+              Haptic.selection();
+              ts.mode = LangMode.english;
+              await ts.save();
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 8),
+          _LangModeOption(
+            label: 'Manual — 1 language',
+            subtitle: 'Translate cards to selected language',
+            selected: ts.mode == LangMode.manual && ts.secondaryLang == null,
+            onTap: () async {
+              Haptic.selection();
+              ts.mode = LangMode.manual;
+              ts.secondaryLang = null;
+              await ts.save();
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 8),
+          _LangModeOption(
+            label: 'Manual — 2 languages',
+            subtitle: 'Primary large + secondary small below',
+            selected: ts.mode == LangMode.manual && ts.secondaryLang != null,
+            onTap: () async {
+              Haptic.selection();
+              ts.mode = LangMode.manual;
+              ts.secondaryLang ??= 'ru';
+              await ts.save();
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 8),
+          _LangModeOption(
+            label: 'Auto by IP',
+            subtitle: 'Detect your country and translate automatically',
+            selected: ts.mode == LangMode.byIp,
+            onTap: () async {
+              Haptic.selection();
+              ts.mode = LangMode.byIp;
+              await ts.save();
+              await ts.detectByIp();
+              setState(() {});
+            },
+          ),
+        ],
+      ),
+
+      // Primary language picker (manual mode only)
+      if (ts.mode == LangMode.manual) ...[
+        const SizedBox(height: 20),
+        const Divider(color: Colors.white10),
+        const SizedBox(height: 16),
+        Text('Primary language', style: _label()),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: langs.entries.map((e) {
+            final sel = ts.primaryLang == e.key;
+            // Skip 'en' from primary when in manual mode — user can stay in English mode instead
+            return _ChipButton(
+              label: e.value,
+              selected: sel,
+              color: const Color(0xFF00D09E),
+              onTap: () async {
+                Haptic.selection();
+                ts.primaryLang = e.key;
+                await ts.save();
+                setState(() {});
+              },
+            );
+          }).toList(),
+        ),
+      ],
+
+      // Secondary language picker (manual 2-lang mode only)
+      if (ts.mode == LangMode.manual && ts.secondaryLang != null) ...[
+        const SizedBox(height: 16),
+        Text('Secondary language', style: _label()),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: langs.entries.map((e) {
+            final sel = ts.secondaryLang == e.key;
+            return _ChipButton(
+              label: e.value,
+              selected: sel,
+              color: const Color(0xFFFF9500),
+              onTap: () async {
+                Haptic.selection();
+                ts.secondaryLang = e.key;
+                await ts.save();
+                setState(() {});
+              },
+            );
+          }).toList(),
+        ),
+      ],
+
+      // Auto IP: show detected language
+      if (ts.mode == LangMode.byIp) ...[
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(children: [
+            const Icon(Icons.language_rounded, color: Colors.white38, size: 18),
+            const SizedBox(width: 10),
+            Text(
+              'Detected: ${langs[ts.activePrimaryLang] ?? ts.activePrimaryLang}',
+              style: GoogleFonts.inter(color: Colors.white54, fontSize: 13),
+            ),
+          ]),
+        ),
+      ],
+    ]);
+  }
+
   // ── ABOUT ────────────────────────────────────────────────
   Widget _buildAboutSection() {
     return _Card(children: [
@@ -562,6 +704,57 @@ class _InputField extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+class _LangModeOption extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LangModeOption({
+    required this.label, required this.subtitle,
+    required this.selected, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF00D09E);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? accent.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? accent : Colors.white12, width: selected ? 1.5 : 1),
+        ),
+        child: Row(children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 18, height: 18,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: selected ? accent : Colors.white24, width: 2),
+              color: selected ? accent : Colors.transparent,
+            ),
+            child: selected ? const Icon(Icons.check, size: 11, color: Colors.black) : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label, style: GoogleFonts.inter(
+                color: selected ? accent : Colors.white70,
+                fontWeight: FontWeight.w600, fontSize: 13,
+              )),
+              Text(subtitle, style: GoogleFonts.inter(color: Colors.white38, fontSize: 11)),
+            ]),
+          ),
+        ]),
+      ),
+    );
   }
 }
 

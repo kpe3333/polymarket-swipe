@@ -3,11 +3,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
+import '../services/translation_service.dart';
 import '../utils/category_colors.dart';
 
-class MarketCard extends StatelessWidget {
+class MarketCard extends StatefulWidget {
   final Market market;
-  final double swipeProgress; // -1.0 left .. 1.0 right
+  final double swipeProgress;
   final VoidCallback? onTap;
 
   const MarketCard({
@@ -18,7 +19,36 @@ class MarketCard extends StatelessWidget {
   });
 
   @override
+  State<MarketCard> createState() => _MarketCardState();
+}
+
+class _MarketCardState extends State<MarketCard> {
+  final _ts = TranslationService();
+  String? _translatedQuestion;
+  String? _secondaryQuestion;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTranslations();
+  }
+
+  Future<void> _loadTranslations() async {
+    final primary = _ts.activePrimaryLang;
+    if (primary != 'en') {
+      final t = await _ts.translate(widget.market.question, primary);
+      if (mounted) setState(() => _translatedQuestion = t);
+    }
+    if (_ts.hasSecondary && _ts.secondaryLang != null) {
+      final t2 = await _ts.translate(widget.market.question, _ts.secondaryLang!);
+      if (mounted) setState(() => _secondaryQuestion = t2);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final market = widget.market;
+    final swipeProgress = widget.swipeProgress;
     final style = categoryStyle(market.category);
     final betOpacity = swipeProgress.clamp(0.0, 1.0);
     final skipOpacity = (-swipeProgress).clamp(0.0, 1.0);
@@ -29,7 +59,7 @@ class MarketCard extends StatelessWidget {
     if (swipeProgress < -0.05) tintColor = const Color(0xFFFF4D6D).withOpacity(skipOpacity * 0.15);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
@@ -140,22 +170,33 @@ class MarketCard extends StatelessWidget {
   }
 
   Widget _buildQuestion() {
-    return Text(
-      market.question,
-      style: GoogleFonts.inter(
-        fontSize: 19,
-        fontWeight: FontWeight.w700,
-        color: Colors.white,
-        height: 1.3,
-      ),
-      maxLines: 4,
-      overflow: TextOverflow.ellipsis,
+    final displayText = _translatedQuestion ?? widget.market.question;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          displayText,
+          style: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w700, color: Colors.white, height: 1.3),
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+        ),
+        // Secondary language (smaller, below)
+        if (_secondaryQuestion != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _secondaryQuestion!,
+            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white38, height: 1.3),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
     );
   }
 
   Widget _buildDescription() {
     return Text(
-      market.description!,
+      widget.market.description!,
       style: GoogleFonts.inter(fontSize: 12, color: Colors.white38, height: 1.4),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
@@ -163,6 +204,7 @@ class MarketCard extends StatelessWidget {
   }
 
   Widget _buildOddsBar(Color primary) {
+    final market = widget.market;
     return Column(
       children: [
         Row(
@@ -199,6 +241,7 @@ class MarketCard extends StatelessWidget {
   }
 
   Widget _buildStats(Color primary) {
+    final market = widget.market;
     return Row(
       children: [
         _StatChip(icon: Icons.bar_chart_rounded, label: 'Vol ${market.volumeFormatted}'),
