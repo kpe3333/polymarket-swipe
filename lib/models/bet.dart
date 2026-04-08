@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum BetStatus { open, won, lost }
@@ -66,7 +67,7 @@ class Bet {
   );
 }
 
-class BetStore {
+class BetStore extends ChangeNotifier {
   static final BetStore _i = BetStore._();
   factory BetStore() => _i;
   BetStore._();
@@ -94,6 +95,7 @@ class BetStore {
   Future<void> addBet(Bet bet) async {
     _bets.insert(0, bet);
     await _save();
+    notifyListeners();
   }
 
   Future<void> _save() async {
@@ -125,6 +127,9 @@ class BetStore {
       }
       return b;
     }).toList();
-    if (changed) await _save();
+    if (changed) {
+      await _save();
+      notifyListeners();
+    }
   }
 }

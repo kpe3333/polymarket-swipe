@@ -1,4 +1,5 @@
 import 'package:appinio_swiper/appinio_swiper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../utils/haptic.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,15 +31,32 @@ class _FeedScreenState extends State<FeedScreen> {
   bool _loadingMore = false;
   Market? _lastSkipped;
   double _swipeProgress = 0.0;
+  Key _swiperKey = UniqueKey();
+  Set<String> _lastCategories = {};
+
+  List<Market> get _filtered {
+    if (_settings.selectedCategories.isEmpty) return _markets;
+    return _markets.where((m) => _settings.selectedCategories.contains(m.category)).toList();
+  }
 
   @override
   void initState() {
     super.initState();
+    _lastCategories = Set.from(_settings.selectedCategories);
     _loadMarkets();
+    _settings.addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (!setEquals(_settings.selectedCategories, _lastCategories)) {
+      _lastCategories = Set.from(_settings.selectedCategories);
+      setState(() { _currentIndex = 0; _swiperKey = UniqueKey(); });
+    }
   }
 
   @override
   void dispose() {
+    _settings.removeListener(_onSettingsChanged);
     _swiperController.dispose();
     super.dispose();
   }
@@ -47,7 +65,7 @@ class _FeedScreenState extends State<FeedScreen> {
     if (!more) setState(() { _loading = true; _error = null; });
     else setState(() => _loadingMore = true);
     try {
-      final markets = await _service.fetchMarkets(limit: 30);
+      final markets = await _service.fetchMarkets(limit: 100);
       setState(() {
         if (more) {
           _markets.addAll(markets);
@@ -64,14 +82,15 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _onSwipe(int prevIndex, int? currentIndex, SwiperActivity activity) {
+    final cards = _filtered;
     if (activity is Swipe) {
       if (activity.direction == AxisDirection.right) {
         Haptic.medium();
         setState(() { _bets++; _lastSkipped = null; });
-        _openBetDialog(_markets[prevIndex]);
+        if (prevIndex < cards.length) _openBetDialog(cards[prevIndex]);
       } else if (activity.direction == AxisDirection.left) {
         Haptic.light();
-        setState(() { _skips++; _lastSkipped = _markets[prevIndex]; });
+        setState(() { _skips++; _lastSkipped = prevIndex < cards.length ? cards[prevIndex] : null; });
       }
     }
     if (currentIndex != null) {
@@ -194,7 +213,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   Widget _buildTopBar() {
-    final remaining = _markets.isEmpty ? 0 : (_markets.length - _currentIndex);
+    final remaining = _filtered.isEmpty ? 0 : (_filtered.length - _currentIndex).clamp(0, _filtered.length);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Row(
@@ -278,7 +297,8 @@ class _FeedScreenState extends State<FeedScreen> {
       );
     }
 
-    if (_markets.isEmpty) {
+    final cards = _filtered;
+    if (cards.isEmpty) {
       return _EmptyState(onRefresh: _loadMarkets);
     }
 
@@ -296,14 +316,15 @@ class _FeedScreenState extends State<FeedScreen> {
         onPointerUp: (_) => setState(() => _swipeProgress = 0.0),
         onPointerCancel: (_) => setState(() => _swipeProgress = 0.0),
         child: AppinioSwiper(
+          key: _swiperKey,
           controller: _swiperController,
-          cardCount: _markets.length,
+          cardCount: cards.length,
           onSwipeEnd: _onSwipe,
           onEnd: () => _loadMarkets(),
           cardBuilder: (context, index) => MarketCard(
-            market: _markets[index],
+            market: cards[index],
             swipeProgress: index == _currentIndex ? _swipeProgress : 0.0,
-            onTap: () => _openDetail(_markets[index]),
+            onTap: () => _openDetail(cards[index]),
           ),
         ),
       ),

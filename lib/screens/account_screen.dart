@@ -311,7 +311,12 @@ class _AccountScreenState extends State<AccountScreen> {
           return Expanded(
             child: GestureDetector(
               onTap: () async {
-                HapticFeedback.mediumImpact();
+                switch (i) {
+                  case 1: HapticFeedback.lightImpact(); break;
+                  case 2: HapticFeedback.mediumImpact(); break;
+                  case 3: HapticFeedback.heavyImpact(); break;
+                  default: break;
+                }
                 await _settings.setHapticLevel(i);
                 setState(() {});
               },
@@ -389,19 +394,6 @@ class _AccountScreenState extends State<AccountScreen> {
               setState(() {});
             },
           ),
-          const SizedBox(height: 8),
-          _LangModeOption(
-            label: 'Auto by IP',
-            subtitle: 'Detect your country and translate automatically',
-            selected: ts.mode == LangMode.byIp,
-            onTap: () async {
-              Haptic.selection();
-              ts.mode = LangMode.byIp;
-              await ts.save();
-              await ts.detectByIp();
-              setState(() {});
-            },
-          ),
         ],
       ),
 
@@ -456,26 +448,6 @@ class _AccountScreenState extends State<AccountScreen> {
         ),
       ],
 
-      // Auto IP: show detected language
-      if (ts.mode == LangMode.byIp) ...[
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: Row(children: [
-            const Icon(Icons.language_rounded, color: Colors.white38, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              'Detected: ${langs[ts.activePrimaryLang] ?? ts.activePrimaryLang}',
-              style: GoogleFonts.inter(color: Colors.white54, fontSize: 13),
-            ),
-          ]),
-        ),
-      ],
     ]);
   }
 

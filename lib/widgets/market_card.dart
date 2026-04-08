@@ -31,6 +31,19 @@ class _MarketCardState extends State<MarketCard> {
   void initState() {
     super.initState();
     _loadTranslations();
+    _ts.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() {
+    if (!mounted) return;
+    setState(() { _translatedQuestion = null; _secondaryQuestion = null; });
+    _loadTranslations();
+  }
+
+  @override
+  void dispose() {
+    _ts.removeListener(_onLangChanged);
+    super.dispose();
   }
 
   Future<void> _loadTranslations() async {

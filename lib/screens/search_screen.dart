@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/bet.dart';
 import '../models/market.dart';
 import '../services/polymarket_service.dart';
 import '../widgets/market_card.dart';
@@ -27,11 +28,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   static const _trending = ['Trump', 'Bitcoin', 'NBA', 'Fed rate', 'AI', 'Election'];
 
+  Set<String> get _betMarketIds => BetStore().bets.map((b) => b.marketId).toSet();
+
   @override
   void initState() {
     super.initState();
     _loadAll();
-    _focus.requestFocus();
   }
 
   @override
@@ -52,15 +54,18 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onSearch(String q) {
+    final betIds = _betMarketIds;
     setState(() {
       _query = q.trim().toLowerCase();
       if (_query.isEmpty) {
         _results = [];
       } else {
         _results = _all.where((m) =>
-          m.question.toLowerCase().contains(_query) ||
-          (m.category?.toLowerCase().contains(_query) ?? false) ||
-          (m.description?.toLowerCase().contains(_query) ?? false)
+          !betIds.contains(m.id) && (
+            m.question.toLowerCase().contains(_query) ||
+            (m.category?.toLowerCase().contains(_query) ?? false) ||
+            (m.description?.toLowerCase().contains(_query) ?? false)
+          )
         ).toList();
       }
     });
@@ -211,7 +216,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Text('🕐 Top by Volume',
                 style: GoogleFonts.inter(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            ..._all.take(5).map((m) => _SearchResultCard(
+            ..._all.where((m) => !_betMarketIds.contains(m.id)).take(5).map((m) => _SearchResultCard(
               market: m,
               onTap: () => _openDetail(m),
               onBet: () => _openBet(m),

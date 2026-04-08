@@ -19,11 +19,14 @@ class _PortfolioScreenState extends State<PortfolioScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    _store.load().then((_) => setState(() {}));
+    _store.addListener(_onStoreChanged);
   }
+
+  void _onStoreChanged() { if (mounted) setState(() {}); }
 
   @override
   void dispose() {
+    _store.removeListener(_onStoreChanged);
     _tabs.dispose();
     super.dispose();
   }

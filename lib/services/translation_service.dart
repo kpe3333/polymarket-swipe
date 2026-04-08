@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum LangMode { english, manual, byIp }
+enum LangMode { english, manual }
 
-class TranslationService {
+class TranslationService extends ChangeNotifier {
   static final TranslationService _i = TranslationService._();
   factory TranslationService() => _i;
   TranslationService._();
@@ -13,7 +14,6 @@ class TranslationService {
   LangMode mode = LangMode.english;
   String primaryLang = 'en';   // main language
   String? secondaryLang;       // optional second language shown below
-  String? _detectedLang;       // auto-detected by IP
 
   final Map<String, String> _cache = {};
 
@@ -56,25 +56,10 @@ class TranslationService {
     } else {
       await p.remove('lang_secondary');
     }
+    notifyListeners();
   }
 
-  Future<void> detectByIp() async {
-    try {
-      final r = await http.get(Uri.parse('https://ipapi.co/json/')).timeout(const Duration(seconds: 5));
-      if (r.statusCode == 200) {
-        final json = jsonDecode(r.body);
-        final countryCode = (json['country_code'] as String?)?.toLowerCase();
-        _detectedLang = _countryToLang(countryCode);
-      }
-    } catch (_) {
-      _detectedLang = 'en';
-    }
-  }
-
-  String get activePrimaryLang {
-    if (mode == LangMode.byIp) return _detectedLang ?? 'en';
-    return primaryLang;
-  }
+String get activePrimaryLang => primaryLang;
 
   bool get needsTranslation => activePrimaryLang != 'en';
   bool get hasSecondary => mode == LangMode.manual && secondaryLang != null && secondaryLang != 'en';
@@ -114,18 +99,4 @@ class TranslationService {
     await p.setString('translation_cache', jsonEncode(_cache));
   }
 
-  String _countryToLang(String? code) {
-    const map = {
-      'ru': 'ru', 'by': 'ru', 'kz': 'ru', 'ua': 'uk',
-      'de': 'de', 'at': 'de', 'ch': 'de',
-      'fr': 'fr', 'be': 'fr',
-      'es': 'es', 'mx': 'es', 'ar': 'es', 'co': 'es',
-      'cn': 'zh', 'tw': 'zh',
-      'jp': 'ja', 'kr': 'ko',
-      'sa': 'ar', 'ae': 'ar', 'eg': 'ar',
-      'br': 'pt', 'pt': 'pt',
-      'tr': 'tr',
-    };
-    return map[code] ?? 'en';
-  }
 }

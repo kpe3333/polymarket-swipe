@@ -36,12 +36,40 @@ class _BetDialogState extends State<BetDialog> {
   String? _selectedOutcome;
   late double _amount;
 
-  static const _quickAmounts = [1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+  late final TextEditingController _dollarsCtrl;
+  late final TextEditingController _centsCtrl;
+
+  static const _quickAmounts = [0.10, 1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
 
   @override
   void initState() {
     super.initState();
-    _amount = _settings.defaultBet;
+    _amount = _settings.defaultBet.clamp(0.10, double.infinity);
+    _dollarsCtrl = TextEditingController(text: '${_amount.floor()}');
+    _centsCtrl = TextEditingController(
+      text: '${((_amount - _amount.floor()) * 100).round()}'.padLeft(2, '0'),
+    );
+  }
+
+  @override
+  void dispose() {
+    _dollarsCtrl.dispose();
+    _centsCtrl.dispose();
+    super.dispose();
+  }
+
+  void _setAmount(double v) {
+    final clamped = v.clamp(0.10, double.infinity);
+    setState(() { _amount = clamped; });
+    _dollarsCtrl.text = '${clamped.floor()}';
+    _centsCtrl.text = '${((clamped - clamped.floor()) * 100).round()}'.padLeft(2, '0');
+  }
+
+  void _onCustomChanged() {
+    final d = int.tryParse(_dollarsCtrl.text) ?? 0;
+    final c = (int.tryParse(_centsCtrl.text) ?? 0).clamp(0, 99);
+    final v = (d + c / 100.0).clamp(0.10, double.infinity);
+    setState(() => _amount = v);
   }
 
   @override
@@ -130,16 +158,14 @@ class _BetDialogState extends State<BetDialog> {
               ),
               const SizedBox(height: 10),
               Wrap(
-                spacing: 8,
+                spacing: 8, runSpacing: 8,
                 children: _quickAmounts.map((v) {
-                  final selected = _amount == v;
+                  final selected = (_amount - v).abs() < 0.001;
+                  final label = v < 1.0 ? '${(v * 100).round()}¢' : '\$${v.toStringAsFixed(0)}';
                   return GestureDetector(
-                    onTap: () {
-                      Haptic.selection();
-                      setState(() => _amount = v);
-                    },
+                    onTap: () { Haptic.selection(); _setAmount(v); },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: selected ? style.primary.withOpacity(0.2) : Colors.white.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(12),
@@ -149,18 +175,61 @@ class _BetDialogState extends State<BetDialog> {
                         ),
                       ),
                       child: Text(
-                        '\$${v.toStringAsFixed(0)}',
+                        label,
                         style: GoogleFonts.inter(
                           color: selected ? style.primary : Colors.white38,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                          fontWeight: FontWeight.w700, fontSize: 14,
                         ),
                       ),
                     ),
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              // Custom dollar + cent input
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _AmountField(
+                      controller: _dollarsCtrl,
+                      prefix: '\$',
+                      hint: '0',
+                      onChanged: (_) => _onCustomChanged(),
+                      primary: style.primary,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('.', style: GoogleFonts.inter(color: Colors.white54, fontSize: 22, fontWeight: FontWeight.w700)),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: _AmountField(
+                      controller: _centsCtrl,
+                      prefix: '¢',
+                      hint: '00',
+                      maxLength: 2,
+                      onChanged: (_) => _onCustomChanged(),
+                      primary: style.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: style.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: style.primary.withOpacity(0.4)),
+                    ),
+                    child: Text(
+                      'Total: \$${_amount.toStringAsFixed(2)}',
+                      style: GoogleFonts.inter(color: style.primary, fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
               // Potential return
               if (_selectedOutcome != null) ...[
@@ -208,7 +277,7 @@ class _BetDialogState extends State<BetDialog> {
                     child: Center(
                       child: Text(
                         _selectedOutcome != null
-                            ? 'Place Bet — \$$_amount on $_selectedOutcome'
+                            ? 'Place Bet — \$${_amount.toStringAsFixed(2)} on $_selectedOutcome'
                             : 'Select YES or NO first',
                         style: GoogleFonts.inter(
                           color: _selectedOutcome != null ? Colors.black : Colors.white24,
@@ -296,6 +365,45 @@ class _OutcomeButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AmountField extends StatelessWidget {
+  final TextEditingController controller;
+  final String prefix;
+  final String hint;
+  final int maxLength;
+  final void Function(String) onChanged;
+  final Color primary;
+
+  const _AmountField({
+    required this.controller, required this.prefix, required this.hint,
+    this.maxLength = 6, required this.onChanged, required this.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      keyboardType: TextInputType.number,
+      maxLength: maxLength,
+      style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+      textAlign: TextAlign.center,
+      decoration: InputDecoration(
+        counterText: '',
+        prefixText: prefix,
+        prefixStyle: GoogleFonts.inter(color: primary, fontSize: 15, fontWeight: FontWeight.w700),
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(color: Colors.white24),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       ),
     );
   }

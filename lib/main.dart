@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/app_settings.dart';
 import 'models/bet.dart';
-import 'services/translation_service.dart';
+import 'services/translation_service.dart' show TranslationService;
 import 'screens/feed_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/portfolio_screen.dart';
@@ -15,9 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppSettings().load();
   await BetStore().load();
-  final ts = TranslationService();
-  await ts.load();
-  if (ts.mode == LangMode.byIp) await ts.detectByIp();
+  await TranslationService().load();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
