@@ -34,6 +34,16 @@ class _MarketCardState extends State<MarketCard> {
     _ts.addListener(_onLangChanged);
   }
 
+  @override
+  void didUpdateWidget(MarketCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.market.id != widget.market.id) {
+      _translatedQuestion = null;
+      _secondaryQuestion = null;
+      _loadTranslations();
+    }
+  }
+
   void _onLangChanged() {
     if (!mounted) return;
     _translatedQuestion = null;

@@ -4,17 +4,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
+import '../models/watchlist.dart';
 import '../utils/category_colors.dart';
+import '../utils/haptic.dart';
 import '../widgets/bet_dialog.dart';
 
-class MarketDetailScreen extends StatelessWidget {
+class MarketDetailScreen extends StatefulWidget {
   final Market market;
 
   const MarketDetailScreen({super.key, required this.market});
 
   @override
+  State<MarketDetailScreen> createState() => _MarketDetailScreenState();
+}
+
+class _MarketDetailScreenState extends State<MarketDetailScreen> {
+  final _watchlist = WatchlistStore();
+
+  @override
+  void initState() {
+    super.initState();
+    _watchlist.addListener(_rebuild);
+  }
+
+  void _rebuild() { if (mounted) setState(() {}); }
+
+  @override
+  void dispose() {
+    _watchlist.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  Market get market => widget.market;
+
+  @override
   Widget build(BuildContext context) {
     final style = categoryStyle(market.category);
+    final isWatched = _watchlist.isWatched(market.id);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A14),
@@ -29,13 +55,28 @@ class MarketDetailScreen extends StatelessWidget {
               onTap: () => Navigator.pop(context),
               child: Container(
                 margin: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: Colors.black26, shape: BoxShape.circle),
                 child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               ),
             ),
+            actions: [
+              GestureDetector(
+                onTap: () {
+                  Haptic.swipe();
+                  _watchlist.toggle(market);
+                },
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.black26, shape: BoxShape.circle),
+                  child: Icon(
+                    isWatched ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                    color: isWatched ? const Color(0xFFFFD700) : Colors.white70,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,

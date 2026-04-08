@@ -35,7 +35,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   String? _selectedCategory; // null = no category filter active
 
-  static const _pageSize = 30;
+  static const _pageSize = 100;
 
   static const _categories = [
     'All',
@@ -92,21 +92,34 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_browseLoading && _browseOffset > 0) return;
     setState(() => _browseLoading = true);
     try {
-      final fresh = await _service.fetchMarkets(limit: _pageSize, offset: _browseOffset);
-      final betIds = _betMarketIds;
-      final filtered = fresh.where((m) {
-        if (betIds.contains(m.id)) return false;
-        if (_selectedCategory == null || _selectedCategory == 'All') return true;
-        return m.category == _selectedCategory;
-      }).toList();
-      setState(() {
+      // For category-filtered browsing, fetch multiple pages until we accumulate
+      // at least 10 matching markets (or run out)
+      int addedCount = 0;
+      bool hasMore = true;
+      while (addedCount < 10 && hasMore) {
+        final fresh = await _service.fetchMarkets(limit: _pageSize, offset: _browseOffset);
+        if (fresh.isEmpty) { hasMore = false; break; }
+        final betIds = _betMarketIds;
+        final filtered = fresh.where((m) {
+          if (betIds.contains(m.id)) return false;
+          if (_selectedCategory == null || _selectedCategory == 'All') return true;
+          return m.category == _selectedCategory;
+        }).toList();
         _browse.addAll(filtered);
+        addedCount += filtered.length;
         _browseOffset += fresh.length;
-        _browseHasMore = fresh.length == _pageSize;
-        _browseLoading = false;
-      });
+        hasMore = fresh.length == _pageSize;
+        // For "All" category, don't keep fetching
+        if (_selectedCategory == null || _selectedCategory == 'All') break;
+      }
+      if (mounted) {
+        setState(() {
+          _browseHasMore = hasMore;
+          _browseLoading = false;
+        });
+      }
     } catch (_) {
-      setState(() => _browseLoading = false);
+      if (mounted) setState(() => _browseLoading = false);
     }
   }
 

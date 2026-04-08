@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/app_settings.dart';
+import '../models/viewed_markets.dart';
 import '../services/translation_service.dart';
 import '../utils/haptic.dart';
 
@@ -544,6 +545,19 @@ class _AccountScreenState extends State<AccountScreen> {
           _snack('Sending feedback…', Colors.white24);
         },
         trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+      ),
+      const Divider(color: Colors.white10, height: 1),
+      _Row(
+        icon: Icons.history_outlined,
+        label: 'Clear viewed history',
+        onTap: () async {
+          await ViewedStore().clear();
+          Haptic.light();
+          _snack('Viewed history cleared — feed refreshed', const Color(0xFF00D09E));
+          setState(() {});
+        },
+        trailing: Text('${ViewedStore().count} seen',
+            style: GoogleFonts.inter(color: Colors.white24, fontSize: 12)),
       ),
       const Divider(color: Colors.white10, height: 1),
       _Row(

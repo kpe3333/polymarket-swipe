@@ -23,6 +23,18 @@ class Market {
     this.description,
   });
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'question': question,
+    'outcomes': jsonEncode(outcomes),
+    'outcomePrices': jsonEncode(prices.map((p) => p.toString()).toList()),
+    'volume': volume.toString(),
+    'endDate': endDate?.toIso8601String(),
+    'category': category,
+    'image': image,
+    'description': description,
+  };
+
   double get yesPrice => prices.isNotEmpty ? prices[0] : 0.5;
   double get noPrice => prices.length > 1 ? prices[1] : 0.5;
   int get yesPct => (yesPrice * 100).round();

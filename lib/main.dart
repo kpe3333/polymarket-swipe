@@ -4,10 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/app_settings.dart';
 import 'models/bet.dart';
+import 'models/watchlist.dart';
+import 'models/viewed_markets.dart';
 import 'services/translation_service.dart' show TranslationService;
 import 'screens/feed_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/portfolio_screen.dart';
+import 'screens/watchlist_screen.dart';
 import 'screens/account_screen.dart';
 import 'screens/onboarding_screen.dart';
 
@@ -15,6 +18,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppSettings().load();
   await BetStore().load();
+  await WatchlistStore().load();
+  await ViewedStore().load();
   await TranslationService().load();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -107,6 +112,7 @@ class _MainShellState extends State<MainShell> {
   final _screens = const [
     FeedScreen(),
     SearchScreen(),
+    WatchlistScreen(),
     PortfolioScreen(),
     AccountScreen(),
   ];
@@ -134,8 +140,9 @@ class _MainShellState extends State<MainShell> {
             children: [
               _NavItem(icon: Icons.layers_rounded, label: 'Feed', index: 0, current: _tab, onTap: _setTab),
               _NavItem(icon: Icons.search_rounded, label: 'Search', index: 1, current: _tab, onTap: _setTab),
-              _NavItem(icon: Icons.bar_chart_rounded, label: 'Portfolio', index: 2, current: _tab, onTap: _setTab),
-              _NavItem(icon: Icons.person_rounded, label: 'Account', index: 3, current: _tab, onTap: _setTab),
+              _NavItem(icon: Icons.bookmark_rounded, label: 'Saved', index: 2, current: _tab, onTap: _setTab),
+              _NavItem(icon: Icons.bar_chart_rounded, label: 'Portfolio', index: 3, current: _tab, onTap: _setTab),
+              _NavItem(icon: Icons.person_rounded, label: 'Account', index: 4, current: _tab, onTap: _setTab),
             ],
           ),
         ),

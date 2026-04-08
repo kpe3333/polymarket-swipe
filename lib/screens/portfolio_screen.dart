@@ -18,7 +18,7 @@ class _PortfolioScreenState extends State<PortfolioScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _store.addListener(_onStoreChanged);
   }
 
@@ -159,13 +159,21 @@ class _PortfolioScreenState extends State<PortfolioScreen>
             color: const Color(0xFF00D09E),
             onTap: () { _tabs.animateTo(0); setState(() {}); },
           )),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(child: _TabButton(
             label: 'History',
             value: '${_store.resolved.length}',
             selected: _tabs.index == 1,
             color: Colors.white54,
             onTap: () { _tabs.animateTo(1); setState(() {}); },
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: _TabButton(
+            label: 'Stats',
+            value: '📊',
+            selected: _tabs.index == 2,
+            color: const Color(0xFFB57BFF),
+            onTap: () { _tabs.animateTo(2); setState(() {}); },
           )),
         ],
       ),
@@ -178,6 +186,101 @@ class _PortfolioScreenState extends State<PortfolioScreen>
       children: [
         _buildBetList(_store.open, empty: 'No open bets yet\nSwipe right to place a bet!'),
         _buildBetList(_store.resolved, empty: 'No resolved bets yet'),
+        _buildCategoryStats(),
+      ],
+    );
+  }
+
+  Widget _buildCategoryStats() {
+    final allBets = _store.bets;
+    if (allBets.isEmpty) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('📊', style: TextStyle(fontSize: 48)),
+          const SizedBox(height: 16),
+          Text('No bets yet', style: GoogleFonts.inter(color: Colors.white38, fontSize: 15)),
+        ]),
+      );
+    }
+
+    // Group by category
+    final Map<String, List<Bet>> byCat = {};
+    for (final b in allBets) {
+      final cat = b.category ?? 'Other';
+      byCat.putIfAbsent(cat, () => []).add(b);
+    }
+
+    final entries = byCat.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      children: [
+        Text('Performance by category',
+            style: GoogleFonts.inter(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        ...entries.map((e) {
+          final bets = e.value;
+          final resolved = bets.where((b) => b.status != BetStatus.open).toList();
+          final wins = bets.where((b) => b.status == BetStatus.won).length;
+          final losses = bets.where((b) => b.status == BetStatus.lost).length;
+          final pnl = resolved.fold(0.0, (s, b) => s + b.pnl);
+          final winRate = (wins + losses) > 0 ? wins / (wins + losses) : 0.0;
+          final pnlColor = pnl >= 0 ? const Color(0xFF00D09E) : const Color(0xFFFF4D6D);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Text(e.key, style: GoogleFonts.inter(
+                      color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                  const Spacer(),
+                  Text('${bets.length} bet${bets.length != 1 ? 's' : ''}',
+                      style: GoogleFonts.inter(color: Colors.white38, fontSize: 12)),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: _MiniStat(
+                    label: 'Win rate',
+                    value: resolved.isEmpty ? '—' : '${(winRate * 100).round()}%',
+                    color: const Color(0xFF00D09E),
+                  )),
+                  Expanded(child: _MiniStat(
+                    label: 'Won / Lost',
+                    value: '$wins / $losses',
+                    color: Colors.white54,
+                  )),
+                  Expanded(child: _MiniStat(
+                    label: 'P&L',
+                    value: resolved.isEmpty ? '—' : '${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)}',
+                    color: pnlColor,
+                  )),
+                ]),
+                if (resolved.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      height: 6,
+                      child: Row(children: [
+                        if (wins > 0) Expanded(flex: wins, child: Container(color: const Color(0xFF00D09E))),
+                        if (losses > 0) Expanded(flex: losses, child: Container(color: const Color(0xFFFF4D6D))),
+                      ]),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
       ],
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import '../utils/haptic.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/market.dart';
 import '../models/app_settings.dart';
+import '../models/watchlist.dart';
+import '../models/viewed_markets.dart';
 import '../services/polymarket_service.dart';
 import '../widgets/market_card.dart';
 import '../widgets/bet_dialog.dart';
@@ -22,21 +25,30 @@ class _FeedScreenState extends State<FeedScreen> {
   final _swiperController = AppinioSwiperController();
   final _settings = AppSettings();
 
+  final _watchlist = WatchlistStore();
+  final _viewed = ViewedStore();
+
   List<Market> _markets = [];
   bool _loading = true;
   String? _error;
   int _currentIndex = 0;
   int _bets = 0;
   int _skips = 0;
+  int _saved = 0;
   bool _loadingMore = false;
   Market? _lastSkipped;
   double _swipeProgress = 0.0;
   Key _swiperKey = UniqueKey();
   Set<String> _lastCategories = {};
+  Timer? _refreshTimer;
 
   List<Market> get _filtered {
-    if (_settings.selectedCategories.isEmpty) return _markets;
-    return _markets.where((m) => _settings.selectedCategories.contains(m.category)).toList();
+    final viewed = _viewed;
+    var list = _markets.where((m) => !viewed.isViewed(m.id)).toList();
+    if (_settings.selectedCategories.isNotEmpty) {
+      list = list.where((m) => _settings.selectedCategories.contains(m.category)).toList();
+    }
+    return list;
   }
 
   @override
@@ -45,7 +57,11 @@ class _FeedScreenState extends State<FeedScreen> {
     _lastCategories = Set.from(_settings.selectedCategories);
     _loadMarkets();
     _settings.addListener(_onSettingsChanged);
+    _watchlist.addListener(_rebuild);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _autoRefreshPrices());
   }
+
+  void _rebuild() { if (mounted) setState(() {}); }
 
   void _onSettingsChanged() {
     if (!setEquals(_settings.selectedCategories, _lastCategories)) {
@@ -54,9 +70,23 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
+  Future<void> _autoRefreshPrices() async {
+    if (!mounted || _markets.isEmpty) return;
+    try {
+      final fresh = await _service.fetchMarkets(limit: 100);
+      if (!mounted) return;
+      final Map<String, Market> byId = { for (final m in fresh) m.id: m };
+      setState(() {
+        _markets = _markets.map((m) => byId[m.id] ?? m).toList();
+      });
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _settings.removeListener(_onSettingsChanged);
+    _watchlist.removeListener(_rebuild);
     _swiperController.dispose();
     super.dispose();
   }
@@ -84,13 +114,18 @@ class _FeedScreenState extends State<FeedScreen> {
   void _onSwipe(int prevIndex, int? currentIndex, SwiperActivity activity) {
     final cards = _filtered;
     if (activity is Swipe) {
+      final market = prevIndex < cards.length ? cards[prevIndex] : null;
+      if (market != null) _viewed.markViewed(market.id);
+
       if (activity.direction == AxisDirection.right) {
-        Haptic.medium();
+        Haptic.swipe();
         setState(() { _bets++; _lastSkipped = null; });
-        if (prevIndex < cards.length) _openBetDialog(cards[prevIndex]);
+        if (market != null) _openBetDialog(market);
       } else if (activity.direction == AxisDirection.left) {
-        Haptic.light();
-        setState(() { _skips++; _lastSkipped = prevIndex < cards.length ? cards[prevIndex] : null; });
+        Haptic.swipe();
+        setState(() { _skips++; _lastSkipped = market; });
+      } else if (activity.direction == AxisDirection.up) {
+        if (market != null) _saveToWatchlist(market);
       }
     }
     if (currentIndex != null) {
@@ -126,9 +161,20 @@ class _FeedScreenState extends State<FeedScreen> {
   void _undoLastSkip() {
     try {
       _swiperController.unswipe();
-      Haptic.medium();
+      Haptic.swipe();
       setState(() { _skips = (_skips - 1).clamp(0, 9999); _lastSkipped = null; });
     } catch (_) {}
+  }
+
+  void _saveToWatchlist(Market market) {
+    Haptic.swipe();
+    _watchlist.toggle(market);
+    final isNowSaved = _watchlist.isWatched(market.id);
+    setState(() { if (isNowSaved) _saved++; });
+    _showFeedback(
+      isNowSaved ? '🔖 Saved to Watchlist' : '🗑 Removed from Watchlist',
+      isNowSaved ? const Color(0xFF00D09E) : Colors.white24,
+    );
   }
 
   void _showPremiumDialog() {
@@ -251,6 +297,8 @@ class _FeedScreenState extends State<FeedScreen> {
           const SizedBox(width: 8),
           _StatBadge(label: '🎯', value: _bets.toString(), color: const Color(0xFF00D09E)),
           const SizedBox(width: 6),
+          _StatBadge(label: '🔖', value: _saved.toString(), color: const Color(0xFFFFD700)),
+          const SizedBox(width: 6),
           _StatBadge(label: '⏭', value: _skips.toString(), color: Colors.white24),
         ],
       ),
@@ -322,6 +370,7 @@ class _FeedScreenState extends State<FeedScreen> {
           onSwipeEnd: _onSwipe,
           onEnd: () => _loadMarkets(),
           cardBuilder: (context, index) => MarketCard(
+            key: ValueKey(cards[index].id),
             market: cards[index],
             swipeProgress: index == _currentIndex ? _swipeProgress : 0.0,
             onTap: () => _openDetail(cards[index]),
@@ -329,6 +378,12 @@ class _FeedScreenState extends State<FeedScreen> {
         ),
       ),
     );
+  }
+
+  bool get _currentSaved {
+    final cards = _filtered;
+    if (_currentIndex >= cards.length) return false;
+    return _watchlist.isWatched(cards[_currentIndex].id);
   }
 
   Widget _buildBottomButtons() {
@@ -340,7 +395,7 @@ class _FeedScreenState extends State<FeedScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _ActionButton(
-            onTap: () { Haptic.light(); _swiperController.swipeLeft(); },
+            onTap: () { Haptic.swipe(); _swiperController.swipeLeft(); },
             icon: Icons.close_rounded,
             color: const Color(0xFFFF4D6D),
             label: 'SKIP',
@@ -356,7 +411,16 @@ class _FeedScreenState extends State<FeedScreen> {
             badge: _lastSkipped == null ? '★' : null,
           ),
           _ActionButton(
-            onTap: () { Haptic.medium(); _swiperController.swipeRight(); },
+            onTap: () {
+              final cards = _filtered;
+              if (_currentIndex < cards.length) _saveToWatchlist(cards[_currentIndex]);
+            },
+            icon: _currentSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            color: const Color(0xFFB57BFF),
+            label: 'SAVE',
+          ),
+          _ActionButton(
+            onTap: () { Haptic.swipe(); _swiperController.swipeRight(); },
             icon: Icons.bolt_rounded,
             color: const Color(0xFF00D09E),
             label: 'BET',

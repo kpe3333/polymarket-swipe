@@ -21,6 +21,16 @@ class Haptic {
     if (_s.hapticLevel >= 1) HapticFeedback.selectionClick();
   }
 
+  // Fires at whatever intensity level is currently set (for swipes etc.)
+  static void swipe() {
+    switch (_s.hapticLevel) {
+      case 1: HapticFeedback.selectionClick(); break;
+      case 2: HapticFeedback.mediumImpact(); break;
+      case 3: HapticFeedback.vibrate(); break;
+      default: break;
+    }
+  }
+
   // Direct fire for demo — bypasses level check
   static void demoForLevel(int level) {
     switch (level) {
