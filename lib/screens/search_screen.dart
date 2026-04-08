@@ -18,13 +18,36 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _service = PolymarketService();
   final _ctrl = TextEditingController();
-  final _focus = FocusNode();
+  final _scrollCtrl = ScrollController();
 
+  // All loaded markets (for text search)
   List<Market> _all = [];
+  // Browse-mode list (paginated infinite scroll)
+  List<Market> _browse = [];
   List<Market> _results = [];
+
   bool _loading = false;
   bool _initialLoad = false;
+  bool _browseLoading = false;
+  bool _browseHasMore = true;
+  int _browseOffset = 0;
+
   String _query = '';
+  String? _selectedCategory; // null = no category filter active
+
+  static const _pageSize = 30;
+
+  static const _categories = [
+    'All',
+    'Politics',
+    'Crypto',
+    'Sports',
+    'Finance',
+    'Science',
+    'Entertainment',
+    'World',
+    'Other',
+  ];
 
   static const _trending = ['Trump', 'Bitcoin', 'NBA', 'Fed rate', 'AI', 'Election'];
 
@@ -33,13 +56,14 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollCtrl.addListener(_onScroll);
     _loadAll();
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
-    _focus.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -53,6 +77,47 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Future<void> _startBrowse(String? category) async {
+    setState(() {
+      _selectedCategory = category;
+      _browse = [];
+      _browseOffset = 0;
+      _browseHasMore = true;
+      _browseLoading = true;
+    });
+    await _loadMoreBrowse();
+  }
+
+  Future<void> _loadMoreBrowse() async {
+    if (_browseLoading && _browseOffset > 0) return;
+    setState(() => _browseLoading = true);
+    try {
+      final fresh = await _service.fetchMarkets(limit: _pageSize, offset: _browseOffset);
+      final betIds = _betMarketIds;
+      final filtered = fresh.where((m) {
+        if (betIds.contains(m.id)) return false;
+        if (_selectedCategory == null || _selectedCategory == 'All') return true;
+        return m.category == _selectedCategory;
+      }).toList();
+      setState(() {
+        _browse.addAll(filtered);
+        _browseOffset += fresh.length;
+        _browseHasMore = fresh.length == _pageSize;
+        _browseLoading = false;
+      });
+    } catch (_) {
+      setState(() => _browseLoading = false);
+    }
+  }
+
+  void _onScroll() {
+    if (_selectedCategory != null &&
+        _scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 300 &&
+        !_browseLoading && _browseHasMore) {
+      _loadMoreBrowse();
+    }
+  }
+
   void _onSearch(String q) {
     final betIds = _betMarketIds;
     setState(() {
@@ -60,14 +125,22 @@ class _SearchScreenState extends State<SearchScreen> {
       if (_query.isEmpty) {
         _results = [];
       } else {
-        _results = _all.where((m) =>
-          !betIds.contains(m.id) && (
-            m.question.toLowerCase().contains(_query) ||
-            (m.category?.toLowerCase().contains(_query) ?? false) ||
-            (m.description?.toLowerCase().contains(_query) ?? false)
-          )
-        ).toList();
+        _results = _all.where((m) {
+          if (betIds.contains(m.id)) return false;
+          final matchesCategory = _selectedCategory == null || _selectedCategory == 'All' || m.category == _selectedCategory;
+          final matchesText = m.question.toLowerCase().contains(_query) ||
+              (m.category?.toLowerCase().contains(_query) ?? false) ||
+              (m.description?.toLowerCase().contains(_query) ?? false);
+          return matchesCategory && matchesText;
+        }).toList();
       }
+    });
+  }
+
+  void _clearCategory() {
+    setState(() {
+      _selectedCategory = null;
+      _browse = [];
     });
   }
 
@@ -85,7 +158,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final result = await showBetDialog(context, m);
     if (result != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Bet placed: \$${result.amount.toStringAsFixed(0)} on ${result.outcome}',
+        content: Text('Bet placed: \$${result.amount.toStringAsFixed(2)} on ${result.outcome}',
             style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
         backgroundColor: const Color(0xFF00D09E),
         behavior: SnackBarBehavior.floating,
@@ -103,6 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           children: [
             _buildSearchBar(),
+            _buildCategoryRow(),
             Expanded(child: _buildBody()),
           ],
         ),
@@ -112,38 +186,78 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: TextField(
+          controller: _ctrl,
+          onChanged: _onSearch,
+          style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
+          decoration: InputDecoration(
+            hintText: 'Search markets…',
+            hintStyle: GoogleFonts.inter(color: Colors.white24),
+            prefixIcon: const Icon(Icons.search_rounded, color: Colors.white24, size: 22),
+            suffixIcon: _query.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white24, size: 18),
+                    onPressed: () { _ctrl.clear(); _onSearch(''); },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryRow() {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final cat = _categories[i];
+          final sel = _selectedCategory == cat;
+          return GestureDetector(
+            onTap: () {
+              Haptic.selection();
+              if (sel) {
+                _clearCategory();
+              } else {
+                _startBrowse(cat);
+                if (_query.isNotEmpty) _onSearch(_query);
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1A2E),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                color: sel ? const Color(0xFF00D09E).withOpacity(0.18) : const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: sel ? const Color(0xFF00D09E) : Colors.white.withOpacity(0.1),
+                  width: sel ? 1.5 : 1,
+                ),
               ),
-              child: TextField(
-                controller: _ctrl,
-                focusNode: _focus,
-                onChanged: _onSearch,
-                style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Search markets…',
-                  hintStyle: GoogleFonts.inter(color: Colors.white24),
-                  prefixIcon: const Icon(Icons.search_rounded, color: Colors.white24, size: 22),
-                  suffixIcon: _query.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white24, size: 18),
-                          onPressed: () { _ctrl.clear(); _onSearch(''); },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                cat,
+                style: GoogleFonts.inter(
+                  color: sel ? const Color(0xFF00D09E) : Colors.white54,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 13,
                 ),
               ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -153,34 +267,66 @@ class _SearchScreenState extends State<SearchScreen> {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF00D09E)));
     }
 
-    if (_query.isEmpty) return _buildEmpty();
-
-    if (_results.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('🔍', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 16),
-            Text('No results for "$_query"',
-                style: GoogleFonts.inter(color: Colors.white38, fontSize: 15)),
-          ],
+    // Text search active
+    if (_query.isNotEmpty) {
+      if (_results.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🔍', style: TextStyle(fontSize: 48)),
+              const SizedBox(height: 16),
+              Text('No results for "$_query"',
+                  style: GoogleFonts.inter(color: Colors.white38, fontSize: 15)),
+            ],
+          ),
+        );
+      }
+      return ListView.builder(
+        controller: _scrollCtrl,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        itemCount: _results.length,
+        itemBuilder: (_, i) => _SearchResultCard(
+          market: _results[i],
+          onTap: () => _openDetail(_results[i]),
+          onBet: () => _openBet(_results[i]),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-      itemCount: _results.length,
-      itemBuilder: (_, i) => _SearchResultCard(
-        market: _results[i],
-        onTap: () => _openDetail(_results[i]),
-        onBet: () => _openBet(_results[i]),
-      ),
-    );
-  }
+    // Browse mode (category selected)
+    if (_selectedCategory != null) {
+      return ListView.builder(
+        controller: _scrollCtrl,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        itemCount: _browse.length + 1,
+        itemBuilder: (_, i) {
+          if (i == _browse.length) {
+            return _browseLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator(color: Color(0xFF00D09E))),
+                  )
+                : _browseHasMore
+                    ? const SizedBox(height: 20)
+                    : Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Center(
+                          child: Text('All caught up!',
+                              style: GoogleFonts.inter(color: Colors.white24, fontSize: 13)),
+                        ),
+                      );
+          }
+          return _SearchResultCard(
+            market: _browse[i],
+            onTap: () => _openDetail(_browse[i]),
+            onBet: () => _openBet(_browse[i]),
+          );
+        },
+      );
+    }
 
-  Widget _buildEmpty() {
+    // Default: no query, no category — show trending + top
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(

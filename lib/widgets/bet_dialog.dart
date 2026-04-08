@@ -39,7 +39,16 @@ class _BetDialogState extends State<BetDialog> {
   late final TextEditingController _dollarsCtrl;
   late final TextEditingController _centsCtrl;
 
-  static const _quickAmounts = [0.10, 1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+  static const _baseAmounts = [1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+
+  List<double> get _quickAmounts {
+    final def = _settings.defaultBet.clamp(0.10, double.infinity);
+    // Put defaultBet first, then remaining values larger than it
+    if (_baseAmounts.contains(def)) {
+      return [def, ..._baseAmounts.where((v) => v != def)];
+    }
+    return [def, ..._baseAmounts.where((v) => v > def)];
+  }
 
   @override
   void initState() {

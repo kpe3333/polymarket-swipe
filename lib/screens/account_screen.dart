@@ -16,12 +16,14 @@ class _AccountScreenState extends State<AccountScreen> {
   final _settings = AppSettings();
   final _walletCtrl = TextEditingController();
   final _apiKeyCtrl = TextEditingController();
+  late final TextEditingController _betDollarsCtrl;
+  late final TextEditingController _betCentsCtrl;
   bool _apiKeyObscured = true;
 
   static const _categories = [
     'Politics', 'Crypto', 'Sports', 'Science', 'Finance', 'Entertainment', 'World', 'Other',
   ];
-  static const _betOptions = [1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+  static const _betOptions = [0.10, 1.0, 5.0, 10.0, 25.0, 50.0, 100.0];
   static const _volumeOptions = [0.0, 1000.0, 10000.0, 100000.0];
   static const _daysOptions = [0, 7, 30, 90];
   static const _hapticLabels = ['Off', 'Light', 'Medium', 'Heavy'];
@@ -31,12 +33,31 @@ class _AccountScreenState extends State<AccountScreen> {
     super.initState();
     _walletCtrl.text = _settings.walletAddress;
     _apiKeyCtrl.text = _settings.apiKey;
+    _syncBetControllers();
+  }
+
+  void _syncBetControllers() {
+    final bet = _settings.defaultBet.clamp(0.10, double.infinity);
+    _betDollarsCtrl = TextEditingController(text: '${bet.floor()}');
+    _betCentsCtrl = TextEditingController(
+      text: '${((bet - bet.floor()) * 100).round()}'.padLeft(2, '0'),
+    );
+  }
+
+  void _onBetCustomChanged() {
+    final d = int.tryParse(_betDollarsCtrl.text) ?? 0;
+    final c = (int.tryParse(_betCentsCtrl.text) ?? 0).clamp(0, 99);
+    final v = (d + c / 100.0).clamp(0.10, double.infinity);
+    _settings.setDefaultBet(v);
+    setState(() {});
   }
 
   @override
   void dispose() {
     _walletCtrl.dispose();
     _apiKeyCtrl.dispose();
+    _betDollarsCtrl.dispose();
+    _betCentsCtrl.dispose();
     super.dispose();
   }
 
@@ -144,14 +165,64 @@ class _AccountScreenState extends State<AccountScreen> {
       Wrap(
         spacing: 8, runSpacing: 8,
         children: _betOptions.map((v) {
-          final sel = _settings.defaultBet == v;
+          final sel = (_settings.defaultBet - v).abs() < 0.001;
+          final label = v < 1.0 ? '${(v * 100).round()}¢' : '\$${v.toStringAsFixed(0)}';
           return _ChipButton(
-            label: '\$${v.toStringAsFixed(0)}',
+            label: label,
             selected: sel,
             color: const Color(0xFF00D09E),
-            onTap: () async { Haptic.selection(); await _settings.setDefaultBet(v); setState(() {}); },
+            onTap: () async {
+              Haptic.selection();
+              await _settings.setDefaultBet(v);
+              _betDollarsCtrl.text = '${v.floor()}';
+              _betCentsCtrl.text = '${((v - v.floor()) * 100).round()}'.padLeft(2, '0');
+              setState(() {});
+            },
           );
         }).toList(),
+      ),
+      const SizedBox(height: 14),
+      Text('Or enter custom amount:', style: GoogleFonts.inter(color: Colors.white38, fontSize: 12)),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: _BetAmountField(
+              controller: _betDollarsCtrl,
+              prefix: '\$',
+              hint: '0',
+              onChanged: (_) => _onBetCustomChanged(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('.', style: GoogleFonts.inter(color: Colors.white54, fontSize: 22, fontWeight: FontWeight.w700)),
+          ),
+          Expanded(
+            flex: 2,
+            child: _BetAmountField(
+              controller: _betCentsCtrl,
+              prefix: '¢',
+              hint: '00',
+              maxLength: 2,
+              onChanged: (_) => _onBetCustomChanged(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00D09E).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF00D09E).withOpacity(0.4)),
+            ),
+            child: Text(
+              '\$${_settings.defaultBet.toStringAsFixed(2)}',
+              style: GoogleFonts.inter(color: const Color(0xFF00D09E), fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     ]);
   }
@@ -311,13 +382,8 @@ class _AccountScreenState extends State<AccountScreen> {
           return Expanded(
             child: GestureDetector(
               onTap: () async {
-                switch (i) {
-                  case 1: HapticFeedback.lightImpact(); break;
-                  case 2: HapticFeedback.mediumImpact(); break;
-                  case 3: HapticFeedback.heavyImpact(); break;
-                  default: break;
-                }
                 await _settings.setHapticLevel(i);
+                Haptic.demoForLevel(i);
                 setState(() {});
               },
               child: AnimatedContainer(
@@ -725,6 +791,45 @@ class _LangModeOption extends StatelessWidget {
             ]),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+class _BetAmountField extends StatelessWidget {
+  final TextEditingController controller;
+  final String prefix;
+  final String hint;
+  final int maxLength;
+  final void Function(String) onChanged;
+
+  const _BetAmountField({
+    required this.controller, required this.prefix, required this.hint,
+    this.maxLength = 6, required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF00D09E);
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      keyboardType: TextInputType.number,
+      maxLength: maxLength,
+      style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+      textAlign: TextAlign.center,
+      decoration: InputDecoration(
+        counterText: '',
+        prefixText: prefix,
+        prefixStyle: GoogleFonts.inter(color: accent, fontSize: 15, fontWeight: FontWeight.w700),
+        hintText: hint,
+        hintStyle: GoogleFonts.inter(color: Colors.white24),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: accent)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       ),
     );
   }

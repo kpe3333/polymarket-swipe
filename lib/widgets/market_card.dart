@@ -36,7 +36,9 @@ class _MarketCardState extends State<MarketCard> {
 
   void _onLangChanged() {
     if (!mounted) return;
-    setState(() { _translatedQuestion = null; _secondaryQuestion = null; });
+    _translatedQuestion = null;
+    _secondaryQuestion = null;
+    setState(() {});
     _loadTranslations();
   }
 
@@ -47,14 +49,27 @@ class _MarketCardState extends State<MarketCard> {
   }
 
   Future<void> _loadTranslations() async {
+    // Capture question now — check after each await that the card still shows same market
+    final question = widget.market.question;
     final primary = _ts.activePrimaryLang;
+
     if (primary != 'en') {
-      final t = await _ts.translate(widget.market.question, primary);
-      if (mounted) setState(() => _translatedQuestion = t);
+      final t = await _ts.translate(question, primary);
+      if (mounted && widget.market.question == question) {
+        setState(() => _translatedQuestion = t);
+      }
+    } else {
+      // English mode — ensure no stale translation shown
+      if (mounted && _translatedQuestion != null) setState(() => _translatedQuestion = null);
     }
+
     if (_ts.hasSecondary && _ts.secondaryLang != null) {
-      final t2 = await _ts.translate(widget.market.question, _ts.secondaryLang!);
-      if (mounted) setState(() => _secondaryQuestion = t2);
+      final t2 = await _ts.translate(question, _ts.secondaryLang!);
+      if (mounted && widget.market.question == question) {
+        setState(() => _secondaryQuestion = t2);
+      }
+    } else {
+      if (mounted && _secondaryQuestion != null) setState(() => _secondaryQuestion = null);
     }
   }
 

@@ -149,29 +149,25 @@ class _PortfolioScreenState extends State<PortfolioScreen>
 
   Widget _buildTabs() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: TabBar(
-          controller: _tabs,
-          indicator: BoxDecoration(
-            color: const Color(0xFF00D09E).withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF00D09E).withOpacity(0.5)),
-          ),
-          dividerColor: Colors.transparent,
-          labelColor: const Color(0xFF00D09E),
-          unselectedLabelColor: Colors.white38,
-          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
-          tabs: [
-            Tab(text: 'Open (${_store.open.length})'),
-            Tab(text: 'History (${_store.resolved.length})'),
-          ],
-          onTap: (_) => setState(() {}),
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Row(
+        children: [
+          Expanded(child: _TabButton(
+            label: 'Open',
+            value: '${_store.open.length}',
+            selected: _tabs.index == 0,
+            color: const Color(0xFF00D09E),
+            onTap: () { _tabs.animateTo(0); setState(() {}); },
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: _TabButton(
+            label: 'History',
+            value: '${_store.resolved.length}',
+            selected: _tabs.index == 1,
+            color: Colors.white54,
+            onTap: () { _tabs.animateTo(1); setState(() {}); },
+          )),
+        ],
       ),
     );
   }
@@ -356,6 +352,46 @@ class _MiniStat extends StatelessWidget {
       Text(value, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w800, fontSize: 16)),
       Text(label, style: GoogleFonts.inter(color: Colors.white38, fontSize: 11)),
     ]);
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TabButton({
+    required this.label, required this.value,
+    required this.selected, required this.color, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? color.withOpacity(0.12) : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? color : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value, style: GoogleFonts.inter(
+            color: selected ? color : Colors.white38,
+            fontWeight: FontWeight.w800, fontSize: 20,
+          )),
+          const SizedBox(height: 2),
+          Text(label, style: GoogleFonts.inter(color: Colors.white38, fontSize: 11)),
+        ]),
+      ),
+    );
   }
 }
 

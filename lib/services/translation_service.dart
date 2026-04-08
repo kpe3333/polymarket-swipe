@@ -59,7 +59,7 @@ class TranslationService extends ChangeNotifier {
     notifyListeners();
   }
 
-String get activePrimaryLang => primaryLang;
+String get activePrimaryLang => mode == LangMode.english ? 'en' : primaryLang;
 
   bool get needsTranslation => activePrimaryLang != 'en';
   bool get hasSecondary => mode == LangMode.manual && secondaryLang != null && secondaryLang != 'en';
